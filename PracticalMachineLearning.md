@@ -41,33 +41,9 @@ reproducability:
 
     library(AppliedPredictiveModeling)
     library(caret)
-
-    ## Loading required package: lattice
-
-    ## Loading required package: ggplot2
-
     library(rattle)
-
-    ## Rattle: A free graphical interface for data mining with R.
-    ## Version 4.1.0 Copyright (c) 2006-2015 Togaware Pty Ltd.
-    ## Type 'rattle()' to shake, rattle, and roll your data.
-
     library(rpart.plot)
-
-    ## Loading required package: rpart
-
     library(randomForest)
-
-    ## randomForest 4.6-12
-
-    ## Type rfNews() to see new features/changes/bug fixes.
-
-    ## 
-    ## Attaching package: 'randomForest'
-
-    ## The following object is masked from 'package:ggplot2':
-    ## 
-    ##     margin
 
     set.seed(99999)
 
@@ -87,18 +63,17 @@ Next we import the data:
     inTrain <- createDataPartition(trainData$classe, p=0.6, list=FALSE)
     trainPart <- trainData[inTrain, ]
     testPart <- trainData[-inTrain, ]
-    dim(trainPart); dim(testPart)
+    dim(trainPart)
 
     ## [1] 11776   160
 
+    dim(testPart)
+
     ## [1] 7846  160
 
-    # Remove variables that have near Zero Variance
+    # Remove variables from Taining Data that have near Zero Variance
     NZV <- nearZeroVar(trainPart, saveMetrics=TRUE)
     trainPart <- trainPart[,NZV$nzv==FALSE]
-
-    NZV<- nearZeroVar(testPart,saveMetrics=TRUE)
-    testPart <- testPart[,NZV$nzv==FALSE]
 
     # Remove 1st column of training data
     trainPart <- trainPart[c(-1)]
@@ -118,12 +93,9 @@ Next we import the data:
     trainPart <- trainMod
     rm(trainMod)
 
-    #Transform the testPart and tesData data sets
+
     # testPart should have only variables that exist in trainPart
     testPart <- testPart[colnames(trainPart)]
-
-    # remove the classe column from testPart
-    # testPart <- testPart[, 1:length(testPart)-1]  
 
     # Also, testData should only have variables that exist in trainPart MINUS 'classe'
     testData <- testData[colnames(trainPart[, 1:length(trainPart)-1])]  
@@ -148,7 +120,7 @@ ANALYSIS
 
     set.seed(99999)
     modFitDT <- rpart(classe ~ ., data=trainPart, method="class")
-    fancyRpartPlot(modFitDT)
+    fancyRpartPlot(modFitDT, sub="")
 
 ![](PracticalMachineLearning_files/figure-markdown_strict/unnamed-chunk-4-1.png)
 
@@ -246,25 +218,6 @@ ANALYSIS
     fitControl <- trainControl(method = "repeatedcv",number = 5,repeats = 1)
     modFitGBM <- train(classe ~ ., data=trainPart, method = "gbm",trControl = fitControl, verbose = FALSE)
 
-    ## Loading required package: gbm
-
-    ## Loading required package: survival
-
-    ## 
-    ## Attaching package: 'survival'
-
-    ## The following object is masked from 'package:caret':
-    ## 
-    ##     cluster
-
-    ## Loading required package: splines
-
-    ## Loading required package: parallel
-
-    ## Loaded gbm 2.1.1
-
-    ## Loading required package: plyr
-
     predictions <- predict(modFitGBM, newdata=testPart)
     cm <- confusionMatrix(predictions, testPart$classe)
     print(cm, digits=4)
@@ -309,9 +262,9 @@ Conclusion
 ==========
 
 Among the above four methods, **Random Forest** appears to give the
-highest prediction accuracy of 99.87%.
+highest prediction accuracy of 99.91%.
 
-The expected out-of-sample error is 100-99.87 = 0.13%.
+The expected out-of-sample error is 100-99.91 = 0.09%.
 
 #### Predictions with Test Data
 
