@@ -1,0 +1,164 @@
+---
+title: "Practical Machine Learning Assignment"
+author: "Niraj Sinha"
+date: "July 10, 2016"
+output: md_document
+---
+### Practical Machine Learning Assignment
+
+Background
+==========
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+Data
+====
+The training data for this project are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har.
+
+Goal
+====
+The goal of the project is to predict the manner in which the participants did the exercise. 
+
+
+Data Intake & Transformation
+============================
+
+First, we will upload the appropriate packages and set seed for reproducability:
+```{r warning=FALSE, message=FALSE}
+library(AppliedPredictiveModeling)
+library(caret)
+library(rattle)
+library(rpart.plot)
+library(randomForest)
+
+set.seed(99999)
+```
+
+Next we import the data:
+```{r cache=TRUE, warning=FALSE, message=FALSE}
+
+trainDataUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testDataUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+if(!exists("trainData")){
+    trainData <- read.csv(url(trainDataUrl), na.strings=c("NA","#DIV/0!",""),header=TRUE)
+}
+if(!exists("testData")){
+    testData <- read.csv(url(testDataUrl), na.strings=c("NA","#DIV/0!",""),header=TRUE)
+}
+```
+
+```{r warning=FALSE, message=FALSE}
+# Partitioning the Training Data into two:
+inTrain <- createDataPartition(trainData$classe, p=0.6, list=FALSE)
+trainPart <- trainData[inTrain, ]
+testPart <- trainData[-inTrain, ]
+dim(trainPart)
+dim(testPart)
+
+# Remove variables from Taining Data that have near Zero Variance
+NZV <- nearZeroVar(trainPart, saveMetrics=TRUE)
+trainPart <- trainPart[,NZV$nzv==FALSE]
+
+# Remove 1st column of training data
+trainPart <- trainPart[c(-1)]
+
+# Remove variables with more than 70% missing values
+trainMod <- trainPart
+
+for(i in 1:length(trainPart)) {
+    if( sum( is.na( trainPart[, i] ) ) /nrow(trainPart) >= .7) {
+        for(j in 1:length(trainMod)) {
+            if( identical(names(trainPart)[i],names(trainMod)[j]))  {
+                trainMod <- trainMod[ , -j]
+            }   
+        } 
+    }
+}
+trainPart <- trainMod
+rm(trainMod)
+
+
+# testPart should have only variables that exist in trainPart
+testPart <- testPart[colnames(trainPart)]
+
+# Also, testData should only have variables that exist in trainPart MINUS 'classe'
+testData <- testData[colnames(trainPart[, 1:length(trainPart)-1])]  
+
+# Coerce the data into the same type between trainPart and testData
+for (i in 1:length(testData) ) {
+    for(j in 1:length(trainPart)) {
+        if( length( grep(names(trainPart[i]), names(testData)[j]) ) == 1)  {
+            class(testData[j]) <- class(trainPart[i])
+        }      
+    }      
+}
+
+# To get the same class between testing and myTraining
+testData <- rbind(trainPart[2, -58] , testData)
+testData <- testData[-1,]
+
+```
+
+ANALYSIS
+========
+#### Prediction with Decision Trees
+```{R warning=FALSE, message=FALSE}
+set.seed(99999)
+modFitDT <- rpart(classe ~ ., data=trainPart, method="class")
+fancyRpartPlot(modFitDT, sub="")
+
+predictions <- predict(modFitDT, testPart, type = "class")
+cm <- confusionMatrix(predictions, testPart$classe)
+print(cm, digits=4)
+
+plot(cm$table, col = cm$byClass, main = paste("Decision Tree Accuracy =", round(cm$overall['Accuracy'], 4)))
+
+```
+
+#### Prediction with Random Forest
+```{R warning=FALSE, message=FALSE}
+set.seed(99999)
+modFitRF <- randomForest(classe ~ ., data=trainPart)
+predictions <- predict(modFitRF, testPart, type = "class")
+cm <- confusionMatrix(predictions, testPart$classe)
+print(cm, digits=4)
+
+plot(modFitRF)
+
+plot(cm$table, col = cm$byClass, main = paste("Random Forest Accuracy =", round(cm$overall['Accuracy'], 4)))
+
+```
+
+
+#### Prediction with Generalized Boosted Regression
+```{R warning=FALSE, message=FALSE}
+
+set.seed(99999)
+fitControl <- trainControl(method = "repeatedcv",number = 5,repeats = 1)
+modFitGBM <- train(classe ~ ., data=trainPart, method = "gbm",trControl = fitControl, verbose = FALSE)
+
+predictions <- predict(modFitGBM, newdata=testPart)
+cm <- confusionMatrix(predictions, testPart$classe)
+print(cm, digits=4)
+
+plot(modFitGBM, ylim=c(0.9, 1))
+
+```
+
+Conclusion
+=============
+Among the above four methods, **Random Forest** appears to give the highest prediction accuracy of 99.91%.
+
+The expected out-of-sample error is 100-99.91 = 0.09%.
+
+#### Predictions with Test Data
+```{R warning=FALSE, message=FALSE}
+
+predictions <- predict(modFitRF, testData, type = "class")
+predictions
+
+```
